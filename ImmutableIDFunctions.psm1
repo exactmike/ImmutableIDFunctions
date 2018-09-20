@@ -83,7 +83,7 @@ function Connect-ADDrive
     param(
         $Domain
         ,
-        $Credential
+        [pscredential]$Credential
     )
     $Drive = New-PSDrive -Name Domain -PSProvider ActiveDirectory -Server $Domain -Scope Global -Root '//RootDSE/' -ErrorAction Stop -Credential $Credential
 }
