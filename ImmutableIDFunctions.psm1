@@ -24,22 +24,22 @@ function Test-Credential
         ,
         [string]$Domain
     )
-    $Username = switch ($Credentials.UserName)
+    $Username = switch ($Credential.UserName)
     {
         {$_.Contains('@')}
         {
             #Write-Verbose -Verbose -Message "found @"
-        $Credentials.UserName.split('@')[0]
+        $Credential.UserName.split('@')[0]
         }
         {$_.Contains('\')}
         {
             #Write-Verbose -Verbose -Message "found \"
-        $Credentials.UserName.split('\')[1]
+        $Credential.UserName.split('\')[1]
         }
         Default
         {
             #Write-Verbose -Verbose -Message "found neither @ nor \"
-            $Credentials.UserName
+            $Credential.UserName
         }
     }
     #Get the AD User and Authenticate the AD User
@@ -51,7 +51,7 @@ function Test-Credential
     {
         $StartingErrorActionPreference = $ErrorActionPreference
         $ErrorActionPreference = 'Stop'
-        $pc = New-Object System.DirectoryServices.AccountManagement.PrincipalContext $ct,$Domain,$Username,$Credentials.GetNetworkCredential().Password
+        $pc = New-Object System.DirectoryServices.AccountManagement.PrincipalContext $ct,$Domain,$Username,$Credential.GetNetworkCredential().Password
         $ADUser = [System.DirectoryServices.AccountManagement.UserPrincipal]::FindByIdentity($pc,$Username)
         $ErrorActionPreference = $StartingErrorActionPreference
     }
@@ -66,7 +66,7 @@ function Test-Credential
     if ($null -ne $ADUser)
     {
         
-        if ($true -eq $pc.ValidateCredentials($Username,$credentials.GetNetworkCredential().Password))
+        if ($true -eq $pc.ValidateCredentials($Username,$credential.GetNetworkCredential().Password))
         {
             $Authenticated = $true
         }
