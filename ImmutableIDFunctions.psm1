@@ -16,8 +16,8 @@ function Get-ImmutableIDFromGUID
     )
     [Convert]::ToBase64String($Guid.ToByteArray())
 }
-function Test-Credential
-{    
+function Test-ADCredential
+{
     param
     (
         [pscredential]$Credential
@@ -29,12 +29,12 @@ function Test-Credential
         {$_.Contains('@')}
         {
             #Write-Verbose -Verbose -Message "found @"
-        $Credential.UserName.split('@')[0]
+            $Credential.UserName.split('@')[0]
         }
         {$_.Contains('\')}
         {
             #Write-Verbose -Verbose -Message "found \"
-        $Credential.UserName.split('\')[1]
+            $Credential.UserName.split('\')[1]
         }
         Default
         {
@@ -51,8 +51,8 @@ function Test-Credential
     {
         $StartingErrorActionPreference = $ErrorActionPreference
         $ErrorActionPreference = 'Stop'
-        $pc = New-Object System.DirectoryServices.AccountManagement.PrincipalContext $ct,$Domain,$Username,$Credential.GetNetworkCredential().Password
-        $ADUser = [System.DirectoryServices.AccountManagement.UserPrincipal]::FindByIdentity($pc,$Username)
+        $pc = New-Object System.DirectoryServices.AccountManagement.PrincipalContext $ct, $Domain, $Username, $Credential.GetNetworkCredential().Password
+        $ADUser = [System.DirectoryServices.AccountManagement.UserPrincipal]::FindByIdentity($pc, $Username)
         $ErrorActionPreference = $StartingErrorActionPreference
     }
     catch
@@ -65,13 +65,13 @@ function Test-Credential
     }
     if ($null -ne $ADUser)
     {
-        
-        if ($true -eq $pc.ValidateCredentials($Username,$credential.GetNetworkCredential().Password))
+
+        if ($true -eq $pc.ValidateCredentials($Username, $credential.GetNetworkCredential().Password))
         {
             $Authenticated = $true
         }
     }
-    $Authenticated                  
+    $Authenticated
 }
 function Import-ADModule
 {
@@ -96,32 +96,35 @@ function Get-IdentifiedADObject
     Set-Location Domain:\
     $GetADObjectParams = @{
         ErrorAction = 'Stop'
-        Filter = "SAMAccountName -eq '$Identity' -or DistinguishedName -eq '$Identity' -or ObjectGUID -eq '$Identity'"
-        Properties = 'UserPrincipalName','ms-ds-consistencyguid','SAMAccountName'
+        Filter      = "SAMAccountName -eq '$Identity' -or DistinguishedName -eq '$Identity' -or ObjectGUID -eq '$Identity'"
+        Properties  = 'UserPrincipalName', 'ms-ds-consistencyguid', 'SAMAccountName'
     }
-    try {
-       $ADObject =  Get-ADObject @GetADObjectParams | Select-Object -Property @{n='ProvidedIdentity';e={$Identity}},SAMAccountName,DistinguishedName,UserPrincipalName,@{n='ObjectGUIDString';e={$_.ObjectGUID.guid}},ObjectClass,@{n='ms-ds-ConsistencyGuid';e={(Get-GuidFromByteArray -GuidByteArray $_.'ms-ds-consistencyguid').guid}},@{n='Found';e={$true}},@{n='ImmutableIDSourceSet';e={$null -ne $_.'ms-ds-consistencyguid'}},@{n='ExpectedAzureADImmutableID';e={Get-ImmutableIDFromGUID $_.'ms-ds-consistencyguid'}},ObjectGUID
+    try
+    {
+        $ADObject = Get-ADObject @GetADObjectParams | Select-Object -Property @{n = 'ProvidedIdentity'; e = {$Identity}}, SAMAccountName, DistinguishedName, UserPrincipalName, @{n = 'ObjectGUIDString'; e = {$_.ObjectGUID.guid}}, ObjectClass, @{n = 'ms-ds-ConsistencyGuid'; e = {(Get-GuidFromByteArray -GuidByteArray $_.'ms-ds-consistencyguid').guid}}, @{n = 'Found'; e = {$true}}, @{n = 'ImmutableIDSourceSet'; e = {$null -ne $_.'ms-ds-consistencyguid'}}, @{n = 'ExpectedAzureADImmutableID'; e = {Get-ImmutableIDFromGUID $_.'ms-ds-consistencyguid'}}, ObjectGUID
     }
-    catch {
+    catch
+    {
         $_
     }
     if ($null -eq $ADObject)
     {
         [pscustomobject]@{
-            ProvidedIdentity = $Identity
-            SAMAccountName = $null
-            DistinguishedName = $null
-            UserPrincipalName = $null
-            ObjectGUIDString = ''
-            ObjectClass = $null
-            'ms-ds-ConsistencyGuid' = $null
-            Found = $false
-            ImmutableIDSourceSet = $null
+            ProvidedIdentity           = $Identity
+            SAMAccountName             = $null
+            DistinguishedName          = $null
+            UserPrincipalName          = $null
+            ObjectGUIDString           = ''
+            ObjectClass                = $null
+            'ms-ds-ConsistencyGuid'    = $null
+            Found                      = $false
+            ImmutableIDSourceSet       = $null
             ExpectedAzureADImmutableID = $null
-            ObjectGUID = $null
+            ObjectGUID                 = $null
         }
     }
-    else {
+    else
+    {
         $ADObject
     }
     Pop-Location
@@ -134,19 +137,20 @@ function Set-ADObjectImmutableIDAttribute
     )
     Push-Location
     Set-Location Domain:\
-    try {
+    try
+    {
         if ($ADObject.ImmutableIDSourceSet)
         {
             Set-ADObject -Identity $ADObject.ObjectGUIDString -Clear 'ms-DS-ConsistencyGUID' -Confirm:$false -ErrorAction Stop
         }
-        Set-ADObject -Identity $ADObject.ObjectGUIDString -Add @{'ms-DS-ConsistencyGUID'=$($ADObject.ObjectGUID)} -Server $Domain -ErrorAction Stop -confirm:$false       
+        Set-ADObject -Identity $ADObject.ObjectGUIDString -Add @{'ms-DS-ConsistencyGUID' = $($ADObject.ObjectGUID)} -Server $Domain -ErrorAction Stop -confirm:$false
         Start-Sleep -Seconds 3
         $GetADObjectParams = @{
             ErrorAction = 'Stop'
-            Identity = $ADObject.ObjectGUIDString
-            Properties = 'UserPrincipalName','ms-ds-consistencyguid','SAMAccountName'
+            Identity    = $ADObject.ObjectGUIDString
+            Properties  = 'UserPrincipalName', 'ms-ds-consistencyguid', 'SAMAccountName'
         }
-        $UpdatedADObject =  Get-ADObject @GetADObjectParams | Select-Object -Property @{n='ProvidedIdentity';e={$ADObject.ProvidedIdentity}},SAMAccountName,DistinguishedName,UserPrincipalName,@{n='ObjectGUIDString';e={$_.ObjectGUID.guid}},ObjectClass,@{n='ms-ds-ConsistencyGuid';e={(Get-GuidFromByteArray -GuidByteArray $_.'ms-ds-consistencyguid').guid}},@{n='Found';e={$true}},@{n='ImmutableIDSourceSet';e={$null -ne $_.'ms-ds-consistencyguid'}},@{n='ExpectedAzureADImmutableID';e={Get-ImmutableIDFromGUID $_.'ms-ds-consistencyguid'}},ObjectGUID
+        $UpdatedADObject = Get-ADObject @GetADObjectParams | Select-Object -Property @{n = 'ProvidedIdentity'; e = {$ADObject.ProvidedIdentity}}, SAMAccountName, DistinguishedName, UserPrincipalName, @{n = 'ObjectGUIDString'; e = {$_.ObjectGUID.guid}}, ObjectClass, @{n = 'ms-ds-ConsistencyGuid'; e = {(Get-GuidFromByteArray -GuidByteArray $_.'ms-ds-consistencyguid').guid}}, @{n = 'Found'; e = {$true}}, @{n = 'ImmutableIDSourceSet'; e = {$null -ne $_.'ms-ds-consistencyguid'}}, @{n = 'ExpectedAzureADImmutableID'; e = {Get-ImmutableIDFromGUID $_.'ms-ds-consistencyguid'}}, ObjectGUID
         $UpdatedADObject
     }
     catch
